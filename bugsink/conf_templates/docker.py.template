@@ -1,5 +1,6 @@
 import os
 from urllib.parse import urlparse
+import importlib.util
 
 from bugsink.utils import deduce_allowed_hosts, eat_your_own_dogfood
 
@@ -10,15 +11,14 @@ _KIBIBYTE = 1024
 _MEBIBYTE = 1024 * _KIBIBYTE
 _PORT = os.environ.get("PORT", "8000")
 
-
 IS_DOCKER = True
 
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
-DEBUG_CSRF = "USE_DEBUG" if os.getenv("DEBUG_CSRF") == "USE_DEBUG" else os.getenv("DEBUG_CSRF", "False").lower() in ("true", "1", "yes")
+DEBUG_CSRF = "USE_DEBUG" if os.getenv("DEBUG_CSRF") == "USE_DEBUG" else os.getenv("DEBUG_CSRF", "False").lower() in (
+    "true", "1", "yes")
 
 # The security checks on SECRET_KEY are done as part of 'bugsink-manage check --deploy'
 SECRET_KEY = os.getenv("SECRET_KEY")
-
 
 if os.getenv("BEHIND_HTTPS_PROXY", "False").lower() in ("true", "1", "yes"):
     # We hard-tie the ideas of "behind a proxy" and "use https" together: there is no reason to go through the trouble
@@ -37,15 +37,12 @@ else:
         "security.W016",  # CSRF_COOKIE_SECURE
     ]
 
-
 # The time-zone here is the default for display purposes (when no project/user configuration is used).
 # https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-TIME_ZONE
 TIME_ZONE = os.getenv("TIME_ZONE", "UTC")
 
-
 SENTRY_DSN = os.getenv("SENTRY_DSN", None)
 eat_your_own_dogfood(SENTRY_DSN)
-
 
 # Our Docker image is hard-coded to run with snappea in the background; this means we hard-code (as opposed to reading
 # the from the env) certain variables: TASK_ALWAYS_EAGER, WORKAHOLIC and DIGEST_IMMEDIATELY.
@@ -56,21 +53,48 @@ SNAPPEA = {
     "NUM_WORKERS": int(os.getenv("SNAPPEA_NUM_WORKERS", 2)),
 }
 
+DATABASE_BACKENDS = {
+    "mysql": "django.db.backends.mysql",
+    "postgresql": "django.db.backends.postgresql",
+    "postgres": "django.db.backends.postgresql",
+    "mariadb": "django.db.backends.mysql",
+}
+
+DATABASE_REQUIRED_PACKAGES = {
+    "mysql": "mysqlclient",
+    "postgresql": "psycopg",
+    "postgres": "psycopg",
+    "mariadb": "mysqlclient",
+}
+
+DATABASE_PORTS = {
+    "mysql": 3306,
+    "postgresql": 5432,
+    "postgres": 5432,
+    "mariadb": 3306,
+}
 
 if os.getenv("DATABASE_URL"):
     DATABASE_URL = os.getenv("DATABASE_URL")
     parsed = urlparse(DATABASE_URL)
 
-    if parsed.scheme != "mysql":
-        raise ValueError("For DATABASE_URL, only mysql is supported.")
+    if parsed.scheme not in DATABASE_BACKENDS.keys():
+        raise ValueError("For DATABASE_URL, only " + ",".join(list(DATABASE_BACKENDS.keys())) + " are supported")
+
+    if parsed.scheme in DATABASE_REQUIRED_PACKAGES.keys():
+        spec = importlib.util.find_spec(DATABASE_REQUIRED_PACKAGES[parsed.scheme])
+        if spec is None:
+            raise ImportError(
+                f"Package {DATABASE_REQUIRED_PACKAGES[parsed.scheme]} is required when using backend {parsed.scheme} "
+                f"but not installed. Please install it before trying again")
 
     DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.mysql',
+        'ENGINE': DATABASE_BACKENDS[parsed.scheme],
         'NAME': parsed.path.lstrip('/'),
         "USER": parsed.username,
         "PASSWORD": parsed.password,
         "HOST": parsed.hostname,
-        "PORT": parsed.port or "3306",
+        "PORT": parsed.port or DATABASE_PORTS[parsed.scheme],
     }
 
 # else:
@@ -94,7 +118,6 @@ CB_ANYBODY = "CB_ANYBODY"
 CB_MEMBERS = "CB_MEMBERS"
 CB_ADMINS = "CB_ADMINS"
 CB_NOBODY = "CB_NOBODY"
-
 
 BUGSINK = {
     "DIGEST_IMMEDIATELY": False,  # hard-coded, corresponds to Docker setup
@@ -135,7 +158,6 @@ BUGSINK = {
     "VALIDATE_ON_DIGEST": os.getenv("VALIDATE_ON_DIGEST", "none").lower(),  # other legal values are "warn" and "strict"
     "KEEP_ENVELOPES": int(os.getenv("KEEP_ENVELOPES", 0)),  # keep this many in the database; 0 means "don't keep"
 }
-
 
 if os.getenv("ALLOWED_HOSTS"):
     ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(",")
