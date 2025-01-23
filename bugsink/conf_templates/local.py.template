@@ -18,6 +18,15 @@ SECRET_KEY = "{{ secret_key }}"
 # DATABASES["default"]["TEST"]["NAME"] = 'test.sqlite3'
 # DATABASES["snappea"]["NAME"] = 'snappea.sqlite3'
 
+# If you're interested in using mysql/postgres/etc you can configure it like so
+# see https://docs.djangoproject.com/en/5.1/ref/databases/ for documentation on the options for 'ENGINE'
+#   DATABASES["default"]["ENGINE"] = "<django db backend>"
+#   DATABASES["default"]["NAME"] = "<database name>"
+#   DATABASES["default"]["USER"] = "<username for db user>"
+#   DATABASES["default"]["PASSWORD"] = "<password for db user>"
+#   DATABASES["default"]["HOST"] = "<hostname / ip>"
+#   DATABASES["default"]["PORT"] = "<port>"
+
 # Set SENTRY_DSN to track any errors in the Bugsink code itself ("eating your own dogfood").
 SENTRY_DSN = None
 eat_your_own_dogfood(SENTRY_DSN)
